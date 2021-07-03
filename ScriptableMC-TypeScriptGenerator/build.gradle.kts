@@ -25,6 +25,7 @@ idea {
 dependencies {
     implementation(kotlin("stdlib"))
     implementation(kotlin("reflect"))
+    implementation("org.springframework:spring-core:5.3.8")
     implementation("com.beust:klaxon:5.5")
     implementation("com.xenomachina:kotlin-argparser:2.0.7")
     implementation("org.junit.jupiter:junit-jupiter:5.7.0")

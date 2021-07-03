@@ -1,4 +1,4 @@
-package com.pixlfox.graaljs
+package com.pixlfox.scriptablemc.tools
 
 import com.xenomachina.argparser.ArgParser
 import com.xenomachina.argparser.mainBody
@@ -10,16 +10,12 @@ class MainApp {
             "-d", "--debug",
             help = "Additional debug output.")
 
-        val skipClassListImport by parser.flagging(
-            "-i", "--skip-import-class-list",
-            help = "Skip importing the pre-built class list.")
-
         val skipClassListBuild by parser.flagging(
             "-b", "--skip-build-class-list",
             help = "Skip building class list.")
 
         val skipClassListExport by parser.flagging(
-            "-e", "--skip-export-class-list",
+            "-c", "--skip-export-class-list",
             help = "Skip exporting the built class list.")
 
         val skipTypeScriptExport by parser.flagging(
@@ -38,7 +34,8 @@ class MainApp {
     companion object {
         @JvmStatic
         fun main(args: Array<String>): Unit = mainBody {
-            ArgParser(args).parseInto(::Args).run {
+            ArgParser(args).parseInto(MainApp::Args).run {
+
                 val tsGenerator = TypeScriptDefinitionGenerator.fromConfigFile(configFilePath)
 
                 if(debug) {
@@ -53,11 +50,7 @@ class MainApp {
                     )
                 }
 
-                if(!skipClassListImport) {
-                    tsGenerator.importClassList()
-                }
-
-                if(!skipClassListBuild) {
+                if (!skipClassListBuild) {
                     tsGenerator.buildClassList()
                 }
 
