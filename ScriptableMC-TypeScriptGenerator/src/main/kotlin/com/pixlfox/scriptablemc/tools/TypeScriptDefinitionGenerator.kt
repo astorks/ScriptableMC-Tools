@@ -630,6 +630,9 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
         catch (ex: NoSuchMethodError) {
             println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.qualifiedName}): $ex")
         }
+        catch (ex: NoClassDefFoundError) {
+            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.qualifiedName}): $ex")
+        }
         catch (ex: Exception) {
             println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.qualifiedName}): $ex")
         }
@@ -723,6 +726,10 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
         val includeTypes: Array<String> = arrayOf(
             "org.bukkit.*",
             "net.md_5.bungee.api.*",
+            "com.destroystokyo.paper.*",
+            "io.papermc.paper.*",
+            "com.mojang.*",
+            "net.kyori.adventure.*",
             "com.pixlfox.scriptablemc.*",
             "com.smc.*",
             "fr.minuskube.inv.*",
@@ -732,7 +739,7 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
             "java.util.logging.*",
             "khttp.*",
             "org.apache.commons.io.*",
-            "org.graalvm.*",
+            "org.graalvm.*"
         ),
         val excludeTypes: Array<String> = arrayOf(
             "org.bukkit.plugin.java.LibraryLoader",
