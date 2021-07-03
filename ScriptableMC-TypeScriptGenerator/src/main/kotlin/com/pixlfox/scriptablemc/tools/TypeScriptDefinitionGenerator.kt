@@ -215,25 +215,30 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
     private fun toTypeScriptType(type: KType): String {
         val isArray = if(type.classifier is KClass<*>) {
             val typeClass = type.classifier as KClass<*>
+            typeClass.qualifiedName == "kotlin.Array" ||
+                    typeClass.qualifiedName == "kotlin.collections.List" ||
+                    typeClass.qualifiedName == "kotlin.collections.Set"
+        } else false
 
-            when(typeClass.qualifiedName) {
-                "kotlin.Array", "kotlin.collections.List", "kotlin.collections.Set" -> true
-                else -> false
-            }
+        val isClass = if(type.classifier is KClass<*>) {
+            val typeClass = type.classifier as KClass<*>
+            typeClass.qualifiedName == "java.lang.Class"
         } else false
 
         return when {
+            type == typeOf<Any>() -> "any"
+            type == typeOf<Unit>() -> "void"
+            type == typeOf<Boolean>() -> "boolean"
+            type == typeOf<String>() -> "string"
             type == typeOf<Byte>() -> if(configuration.commentTypes) "number/*(Byte)*/" else "number"
             type == typeOf<Short>() -> if(configuration.commentTypes) "number/*(Short)*/" else "number"
             type == typeOf<Int>() -> if(configuration.commentTypes) "number/*(Int)*/" else "number"
             type == typeOf<Long>() -> if(configuration.commentTypes) "number/*(Long)*/" else "number"
             type == typeOf<Float>() -> if(configuration.commentTypes) "number/*(Float)*/" else "number"
             type == typeOf<Double>() -> if(configuration.commentTypes) "number/*(Double)*/" else "number"
-            type == typeOf<String>() -> "string"
-            type == typeOf<Unit>() -> "void"
-            type == typeOf<Boolean>() -> "boolean"
             type == typeOf<IntArray>() -> if(configuration.commentTypes) "Array<number/*(Int)*/>" else "Array<number>"
             type == typeOf<Char>() -> if(configuration.commentTypes) "string/*(Char)*/" else "string"
+            isClass -> "{ new (...args: any[]): ${toTypeScriptType(type.arguments.first().type?.classifier)}; }"
             isArray -> "Array<${toTypeScriptType(type.arguments.first().type?.classifier)}>"
             else -> toTypeScriptType(type.classifier)
         }
@@ -242,7 +247,7 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
     private fun toTypeScriptType(classifier: KClassifier?): String {
         return when {
             (classifier is KClass<*>) -> toTypeScriptType(classifier)
-            configuration.commentTypes -> "any/*???: ${classifier?.javaClass?.kotlin?.qualifiedName}*/"
+//            configuration.commentTypes -> "any/*???: ${classifier?.javaClass?.kotlin?.qualifiedName}*/"
             else -> "any"
         }
     }
@@ -251,16 +256,16 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
         val className = stripPackageName(baseClass)
 
         return when {
+            baseClass.qualifiedName == "kotlin.Any" -> "any"
             baseClass.qualifiedName == "kotlin.Unit" -> "void"
+            baseClass.qualifiedName == "kotlin.Boolean" -> "boolean"
+            baseClass.qualifiedName == "kotlin.String" -> "string"
             baseClass.qualifiedName == "kotlin.Byte" -> if(configuration.commentTypes) "number/*(Byte)*/" else "number"
             baseClass.qualifiedName == "kotlin.Short" -> if(configuration.commentTypes) "number/*(Short)*/" else "number"
             baseClass.qualifiedName == "kotlin.Int" -> if(configuration.commentTypes) "number/*(Int)*/" else "number"
             baseClass.qualifiedName == "kotlin.Long" -> if(configuration.commentTypes) "number/*(Long)*/" else "number"
             baseClass.qualifiedName == "kotlin.Float" -> if(configuration.commentTypes) "number/*(Float)*/" else "number"
             baseClass.qualifiedName == "kotlin.Double" -> if(configuration.commentTypes) "number/*(Double)*/" else "number"
-            baseClass.qualifiedName == "kotlin.String" -> "string"
-            baseClass.qualifiedName == "kotlin.Unit" -> "void"
-            baseClass.qualifiedName == "kotlin.Boolean" -> "boolean"
             baseClass.qualifiedName == "kotlin.IntArray" -> if(configuration.commentTypes) "Array<number/*(Int)*/>" else "Array<number>"
             baseClass.qualifiedName == "kotlin.LongArray" -> if(configuration.commentTypes) "Array<number/*(Long)*/>" else "Array<number>"
             baseClass.qualifiedName == "kotlin.Char" -> if(configuration.commentTypes) "string/*(Char)*/" else "string"
@@ -341,33 +346,6 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
 
         println(LoggingLevel.DEBUG,"Adding ${baseClass.qualifiedName} to the class list.")
         classList.add(baseClass)
-    }
-
-    private fun buildTypeSearchIndexClassList(typeSearchIndexFilePath: String) =
-        buildTypeSearchIndexClassList(File(rootFolder, typeSearchIndexFilePath))
-    private fun buildTypeSearchIndexClassList(typeSearchIndexFile: File) =
-        buildTypeSearchIndexClassList(typeSearchIndexFile.inputStream())
-    private fun buildTypeSearchIndexClassList(typeSearchIndexStream: InputStream?, ignoreWhitelist: Boolean = false): Array<KClass<*>> {
-        if(typeSearchIndexStream == null) return arrayOf()
-
-        val classList = mutableListOf<KClass<*>>()
-        val typeSearchIndex = Klaxon().parseArray<ClassDescription>(typeSearchIndexStream)
-
-        if(typeSearchIndex != null) {
-            for (classDescription in typeSearchIndex) {
-                val loadedClass = loadClass(classDescription)
-
-                if(loadedClass != null) {
-                    classList.add(loadedClass)
-                }
-            }
-        }
-
-        return if(ignoreWhitelist) {
-            classList.distinct().toTypedArray()
-        } else {
-            classList.distinct().filter { isClassAllowed(it) }.toTypedArray()
-        }
     }
 
     private fun getClassFromType(type: KType?): KClass<*>? {
@@ -508,9 +486,6 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
 
     private fun generateJavaScriptSource(baseClass: KClass<*>): String =
         "export default ${stripPackageName(baseClass)} = Java.type('${baseClass.qualifiedName}');"
-
-    private fun generateJavaScriptIndexSource(classes: Array<KClass<*>>): String =
-        generateTypeScriptImports(null, classes, "export")
 
     private fun generateTypeScriptImports(baseClass: KClass<*>): String =
         generateTypeScriptImports(baseClass, buildClassList(baseClass))
@@ -742,8 +717,8 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
     }
 
     class Configuration (
-        val exportFolder: String = "./lib/",
-        val pluginsFolder: String = "./plugins/",
+        val exportFolder: String = "dist",
+        val pluginsFolder: String = "plugins",
         val commentTypes: Boolean = true,
         val includeTypes: Array<String> = arrayOf(
             "org.bukkit.*",
