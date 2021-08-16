@@ -1,4 +1,4 @@
-package com.pixlfox.scriptablemc.tools
+package com.pixlfox.gradle
 
 import java.io.File
 import java.io.FileInputStream

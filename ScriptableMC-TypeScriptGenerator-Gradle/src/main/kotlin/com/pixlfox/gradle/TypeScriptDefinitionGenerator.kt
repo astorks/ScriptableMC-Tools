@@ -1,4 +1,4 @@
-package com.pixlfox.scriptablemc.tools
+package com.pixlfox.gradle
 
 import com.beust.klaxon.*
 import org.springframework.core.KotlinReflectionParameterNameDiscoverer
@@ -11,7 +11,14 @@ import kotlin.reflect.jvm.javaConstructor
 import kotlin.reflect.jvm.javaMethod
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
-class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), private val configuration: Configuration = Configuration(), private val pluginClassLoader: PluginClassLoader = PluginClassLoader.fromPluginsFolder(File(rootFolder, configuration.pluginsFolder))) {
+class TypeScriptDefinitionGenerator(
+    private val rootFolder: File = File("./"),
+    private val configuration: Configuration = Configuration(),
+    private val exportFolder: File = File(rootFolder, configuration.exportFolder),
+    private val pluginClassLoader: PluginClassLoader = PluginClassLoader.fromPluginsFolder(
+        File(rootFolder, configuration.pluginsFolder)
+    )
+) {
 
     private val classList = mutableListOf<KClass<*>>()
     var loggingLevel: EnumSet<LoggingLevel> = EnumSet.of(
@@ -37,10 +44,6 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
 
         if(!exportFolder.exists()) {
             exportFolder.mkdirs()
-        }
-
-        if(!pluginsFolder.exists()) {
-            pluginsFolder.mkdirs()
         }
 
         return this
@@ -114,13 +117,13 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
     private fun generateTypeScriptDefinitions(classes: Array<KClass<*>>) {
         for (baseClass in classes) {
             val file = File(exportFolder, "${getPackageName(baseClass).replace(".", "/")}/${stripPackageName(baseClass)}.d.ts")
+            println(LoggingLevel.INFO, "${baseClass.qualifiedName} -> ${file.path}")
+
             if(file.exists()) file.delete()
             file.parentFile.mkdirs()
             file.createNewFile()
 
             file.writeText(generateTypeScriptDefinitionSource(baseClass))
-
-            println(LoggingLevel.INFO, "${baseClass.qualifiedName} -> ${file.path}")
         }
     }
 
@@ -160,12 +163,6 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
 
     private val functionBlacklistRegex: Regex
         get() = Regex("(${configuration.functionBlacklist.joinToString("|")})")
-
-    private val exportFolder: File
-        get() = File(rootFolder, configuration.exportFolder)
-
-    private val pluginsFolder: File
-        get() = File(rootFolder, configuration.pluginsFolder)
 
     private val systemClassLoader: ClassLoader
         get() = javaClass.classLoader

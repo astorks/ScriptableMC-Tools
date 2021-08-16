@@ -1,6 +1,7 @@
 plugins {
     java
     `maven-publish`
+    `java-gradle-plugin`
     id("org.jetbrains.kotlin.jvm")
     id("com.github.johnrengelman.shadow")
     id("org.jetbrains.gradle.plugin.idea-ext")
@@ -29,10 +30,8 @@ dependencies {
     implementation(kotlin("reflect"))
     implementation("org.springframework:spring-core:5.3.8")
     implementation("com.beust:klaxon:5.5")
-    implementation("com.xenomachina:kotlin-argparser:2.0.7")
-    implementation("org.junit.jupiter:junit-jupiter:5.7.0")
-
-//    testImplementation(kotlin("test"))
+    implementation(project(":ScriptableMC-TypeScriptGenerator"))
+    implementation(gradleApi())
 }
 
 tasks.compileKotlin {
@@ -47,11 +46,16 @@ tasks.compileTestKotlin {
 }
 
 tasks.shadowJar {
-    archiveFileName.set("ScriptableMC-TypeScriptGenerator.jar")
+    archiveFileName.set("ScriptableMC-TypeScriptGenerator-Gradle.jar")
 }
 
-tasks.test {
-    useJUnitPlatform()
+gradlePlugin {
+    plugins {
+        create("hello") {
+            id = "com.pixlfox.gradle.tsgenerator"
+            implementationClass = "com.pixlfox.gradle.TypeScriptDefinitionGeneratorPlugin"
+        }
+    }
 }
 
 publishing {

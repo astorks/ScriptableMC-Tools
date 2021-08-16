@@ -1,16 +1,14 @@
 plugins {
     java
-    id("org.jetbrains.kotlin.jvm") version "1.5.20-RC" apply false
+    `maven-publish`
+    `java-gradle-plugin`
+    id("org.jetbrains.kotlin.jvm") version "1.5.21" apply false
     id("com.github.johnrengelman.shadow") version "7.0.0" apply false
     id("org.jetbrains.gradle.plugin.idea-ext") version "1.0" apply false
 }
 
-var smcVersion = findProperty("smc.version")!!
-var spigotmcVersion = findProperty("spigotmc.version")!!
-
 allprojects {
     group = "com.pixlfox.scriptablemc"
-    version = smcVersion
 
     repositories {
         mavenCentral()
