@@ -2,7 +2,8 @@ plugins {
     java
     `maven-publish`
     `java-gradle-plugin`
-    id("org.jetbrains.kotlin.jvm") version "1.5.21" apply false
+    id("com.gradle.plugin-publish") version "0.14.0" apply false
+    id("org.jetbrains.kotlin.jvm") version "1.6.0" apply false
     id("com.github.johnrengelman.shadow") version "7.0.0" apply false
     id("org.jetbrains.gradle.plugin.idea-ext") version "1.0" apply false
 }

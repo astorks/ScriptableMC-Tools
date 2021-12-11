@@ -13,8 +13,8 @@ repositories {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility  = JavaVersion.VERSION_11
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility  = JavaVersion.VERSION_17
 }
 
 idea {
@@ -25,24 +25,25 @@ idea {
 }
 
 dependencies {
-    implementation(kotlin("stdlib"))
-    implementation(kotlin("reflect"))
-    implementation("org.springframework:spring-core:5.3.8")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.5.31")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:1.5.31")
+    implementation("org.springframework:spring-core:5.3.13")
     implementation("com.beust:klaxon:5.5")
     implementation("com.xenomachina:kotlin-argparser:2.0.7")
-    implementation("org.junit.jupiter:junit-jupiter:5.7.0")
+    implementation("org.junit.jupiter:junit-jupiter:5.8.2")
 
-//    testImplementation(kotlin("test"))
+    // TODO: Implement tests
+    //    testImplementation(kotlin("test"))
 }
 
 tasks.compileKotlin {
-    kotlinOptions.jvmTarget = "11"
+    kotlinOptions.jvmTarget = "17"
     kotlinOptions.javaParameters = true
     kotlinOptions.freeCompilerArgs += "-Xopt-in=kotlin.RequiresOptIn"
 }
 
 tasks.compileTestKotlin {
-    kotlinOptions.jvmTarget = "11"
+    kotlinOptions.jvmTarget = "17"
     kotlinOptions.javaParameters = true
 }
 
