@@ -18,4 +18,6 @@ jobs:
     - name: Fix gradlew permissions
       run: chmod +x ./gradlew
     - name: Build plugin jar files with Gradle
-      run: ./gradlew :build
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: ./gradlew publish
