@@ -1,4 +1,4 @@
-package com.pixlfox.gradle
+package com.pixlfox.scriptablemc.tsgenerator
 
 import com.beust.klaxon.*
 import org.springframework.core.KotlinReflectionParameterNameDiscoverer

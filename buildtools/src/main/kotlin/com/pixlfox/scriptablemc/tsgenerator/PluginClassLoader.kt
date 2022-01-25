@@ -1,4 +1,4 @@
-package com.pixlfox.gradle
+package com.pixlfox.scriptablemc.tsgenerator
 
 import java.io.File
 import java.io.FileInputStream

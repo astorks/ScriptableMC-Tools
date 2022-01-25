@@ -9,7 +9,7 @@ plugins {
 }
 
 version = "1.0.1"
-group = "com.pixlfox.gradle"
+group = "com.pixlfox.scriptablemc"
 
 repositories {
     mavenCentral()
@@ -59,10 +59,10 @@ pluginBundle {
 gradlePlugin {
     plugins {
         create("tsgenerator") {
-            id = "com.pixlfox.gradle.tsgenerator"
-            displayName = "TSGenerator"
-            description = "TypeScript generator for ScriptableMC"
-            implementationClass = "com.pixlfox.gradle.TypeScriptDefinitionGeneratorPlugin"
+            id = "com.pixlfox.scriptablemc.buildtools"
+            displayName = "ScriptableMC BuildTools"
+            description = "Build tools for ScriptableMC"
+            implementationClass = "com.pixlfox.scriptablemc.BuildToolsPlugin"
         }
     }
 }
@@ -70,7 +70,7 @@ gradlePlugin {
 publishing {
     publications {
         shadow {
-            create<MavenPublication>("tsgenerator") {
+            create<MavenPublication>("maven") {
                 artifact(tasks["shadowJar"])
             }
         }

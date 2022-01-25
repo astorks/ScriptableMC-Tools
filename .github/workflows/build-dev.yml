@@ -17,3 +17,9 @@ jobs:
         java-version: '17'
     - name: Fix gradlew permissions
       run: chmod +x ./gradlew
+    - name: Build gradle plugin
+      run: ./gradlew :buildtools:publishAllPublicationsToLocalMavenFSRepository
+    - uses: actions/upload-artifact@v1
+        with:
+          name: maven-repo
+          path: maven-repo/
