@@ -8,7 +8,8 @@ plugins {
     id("org.jetbrains.gradle.plugin.idea-ext")
 }
 
-version = "1.0.0"
+version = "1.0.1"
+group = "com.pixlfox.gradle"
 
 repositories {
     mavenCentral()
@@ -31,7 +32,6 @@ dependencies {
     implementation(kotlin("reflect"))
     implementation("org.springframework:spring-core:5.3.13")
     implementation("com.beust:klaxon:5.5")
-    implementation(project(":ScriptableMC-TypeScriptGenerator"))
     implementation(gradleApi())
 }
 
@@ -47,7 +47,7 @@ tasks.compileTestKotlin {
 }
 
 tasks.shadowJar {
-    archiveFileName.set("ScriptableMC-TypeScriptGenerator-Gradle.jar")
+    archiveFileName.set("scriptablemc-typescriptgenerator-gradle.jar")
 }
 
 pluginBundle {
@@ -70,12 +70,16 @@ gradlePlugin {
 publishing {
     publications {
         shadow {
-            create<MavenPublication>("maven") {
+            create<MavenPublication>("tsgenerator") {
                 artifact(tasks["shadowJar"])
             }
         }
     }
     repositories {
+        maven {
+            name = "LocalMavenFS"
+            url = uri("../maven-repo")
+        }
         maven {
             name = "GitHubPackages"
             url = uri("https://maven.pkg.github.com/astorks/ScriptableMC-Tools")

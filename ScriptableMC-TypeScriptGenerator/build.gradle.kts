@@ -48,7 +48,7 @@ tasks.compileTestKotlin {
 }
 
 tasks.shadowJar {
-    archiveFileName.set("ScriptableMC-TypeScriptGenerator.jar")
+    archiveFileName.set("scriptablemc-typescriptgenerator.jar")
 }
 
 tasks.test {
