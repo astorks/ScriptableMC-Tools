@@ -1,0 +1,114 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.pixlfox.scriptablemc",
+    "module": "buildtools",
+    "version": "1.0.2",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "7.3.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "files": [
+        {
+          "name": "buildtools-1.0.2.jar",
+          "url": "buildtools-1.0.2.jar",
+          "size": 58104,
+          "sha512": "3e1a54ceefa193e996381cc652ca9eced1d141bbd5dddbef852988606c27ced763ba0de11cf4358055764f5c1a403da1061d1670b503e7accae919d0245ca482",
+          "sha256": "d6a86258d6dad8af677c95d4b191d7d517225e32e27f4e715b4a3da8e9468f5d",
+          "sha1": "c65c69e7304e80982866c0921e285dd1734757f3",
+          "md5": "c524818be5ac9a0b4eced4aaba865569"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.jvm.version": 17,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "1.6.10"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-reflect",
+          "version": {
+            "requires": "1.6.10"
+          }
+        },
+        {
+          "group": "org.springframework",
+          "module": "spring-core",
+          "version": {
+            "requires": "5.3.15"
+          }
+        },
+        {
+          "group": "com.beust",
+          "module": "klaxon",
+          "version": {
+            "requires": "5.5"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "buildtools-1.0.2.jar",
+          "url": "buildtools-1.0.2.jar",
+          "size": 58104,
+          "sha512": "3e1a54ceefa193e996381cc652ca9eced1d141bbd5dddbef852988606c27ced763ba0de11cf4358055764f5c1a403da1061d1670b503e7accae919d0245ca482",
+          "sha256": "d6a86258d6dad8af677c95d4b191d7d517225e32e27f4e715b4a3da8e9468f5d",
+          "sha1": "c65c69e7304e80982866c0921e285dd1734757f3",
+          "md5": "c524818be5ac9a0b4eced4aaba865569"
+        }
+      ]
+    },
+    {
+      "name": "shadowRuntimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "shadowed",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "buildtools-1.0.2-all.jar",
+          "url": "buildtools-1.0.2-all.jar",
+          "size": 78585960,
+          "sha512": "a54b7a2a832ad80ce369fb4ee5e5e4a71efabee4d5c0725715a0e4068f54feafeedb99a924896700301ac2a3e7dd5f182c8b5911998c8b4231bc2548090bfe24",
+          "sha256": "dcdc732b89b30822097d8aac70e2e2d4c480675a24dca0e6a666b5d66d7f6ee5",
+          "sha1": "e642bb3952ff8f1b938715cd4ee593dd72fad26b",
+          "md5": "d13c8cdb5144b6626810beef598269e5"
+        }
+      ]
+    }
+  ]
+}
