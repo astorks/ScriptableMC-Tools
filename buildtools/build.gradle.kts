@@ -8,7 +8,7 @@ plugins {
     id("org.jetbrains.gradle.plugin.idea-ext")
 }
 
-version = "1.0.1"
+version = "1.0.2"
 group = "com.pixlfox.scriptablemc"
 
 repositories {
@@ -30,7 +30,7 @@ idea {
 dependencies {
     implementation(kotlin("stdlib"))
     implementation(kotlin("reflect"))
-    implementation("org.springframework:spring-core:5.3.13")
+    implementation("org.springframework:spring-core:5.3.15")
     implementation("com.beust:klaxon:5.5")
     implementation(gradleApi())
 }
@@ -47,7 +47,7 @@ tasks.compileTestKotlin {
 }
 
 tasks.shadowJar {
-    archiveFileName.set("scriptablemc-typescriptgenerator-gradle.jar")
+    archiveFileName.set("scriptablemc-buildtools.jar")
 }
 
 pluginBundle {

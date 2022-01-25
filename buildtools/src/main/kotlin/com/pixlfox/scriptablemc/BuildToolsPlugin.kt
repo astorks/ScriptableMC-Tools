@@ -2,18 +2,23 @@
 
 package com.pixlfox.scriptablemc
 
+import com.pixlfox.scriptablemc.tsgenerator.*
 import org.gradle.api.Action
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.plugins.ExtensionAware
 import java.io.File
 import java.util.*
-import com.pixlfox.scriptablemc.tsgenerator.*
+
 
 fun Project.smc(configure: Action<BuildToolsConfigExtension>): Unit =
-    (this as org.gradle.api.plugins.ExtensionAware).extensions.configure("tsgenerator_config", configure)
+    (this as ExtensionAware).extensions.configure("smc_buildtools_config", configure)
 
 class BuildToolsConfigExtension {
     var typescript: TypeScriptGeneratorConfig = TypeScriptGeneratorConfig()
+    fun typescript(action: Action<in TypeScriptGeneratorConfig>) {
+        action.execute(typescript)
+    }
 }
 
 class TypeScriptGeneratorConfig {
@@ -55,6 +60,11 @@ class BuildToolsPlugin: Plugin<Project> {
     override fun apply(project: Project) {
         project.extensions.add("smc_buildtools_config", BuildToolsConfigExtension())
         val extension = project.extensions.getByType(BuildToolsConfigExtension::class.java)
+        val typescript = extension.typescript
+
+        extension.typescript {
+            it.debug = true
+        }
 
 
         project.task("generateTypeScriptDefinitions") {
@@ -85,7 +95,7 @@ class BuildToolsPlugin: Plugin<Project> {
                     }
                 }
 
-                if(extension.typescript.debugCopyArtifacts) {
+                if(typescript.debugCopyArtifacts) {
                     val pluginsDirectory = File(project.buildDir, "plugin-artifacts")
 
                     if(pluginsDirectory.exists()) {
@@ -112,18 +122,18 @@ class BuildToolsPlugin: Plugin<Project> {
                 val tsGenerator = TypeScriptDefinitionGenerator(
                     exportDirectory.absoluteFile,
                     TypeScriptDefinitionGenerator.Configuration(
-                        commentTypes = extension.typescript.commentTypes,
-                        includeTypes = extension.typescript.includeTypes.toTypedArray(),
-                        excludeTypes = extension.typescript.excludeTypes.toTypedArray(),
-                        functionBlacklist = extension.typescript.functionBlacklist.toTypedArray(),
-                        safeNames = extension.typescript.safeNames,
-                        safeClassNames = extension.typescript.safeClassNames
+                        commentTypes = typescript.commentTypes,
+                        includeTypes = typescript.includeTypes.toTypedArray(),
+                        excludeTypes = typescript.excludeTypes.toTypedArray(),
+                        functionBlacklist = typescript.functionBlacklist.toTypedArray(),
+                        safeNames = typescript.safeNames,
+                        safeClassNames = typescript.safeClassNames
                     ),
                     exportDirectory.absoluteFile,
                     PluginClassLoader(artifactFileList.toTypedArray())
                 )
 
-                if(extension.typescript.debug) {
+                if(typescript.debug) {
                     tsGenerator.logging(
                         EnumSet.of(
                             TypeScriptDefinitionGenerator.LoggingLevel.DEBUG,
