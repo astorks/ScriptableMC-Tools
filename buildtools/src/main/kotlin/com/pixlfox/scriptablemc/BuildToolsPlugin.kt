@@ -68,12 +68,12 @@ class BuildToolsPlugin: Plugin<Project> {
 
 
         project.task("generateTypeScriptDefinitions") {
-            it.group = "build"
+            it.group = "smc buildtools"
             it.dependsOn("shadowJar")
 
             it.doLast {
                 val defaultConfig = project.configurations.getByName("default")
-                val compileOnlyConfig = project.configurations.getByName("compileOnly")
+                val compileConfig = project.configurations.getByName("compileClasspath")
                 val artifactFileList = mutableListOf<File>()
                 val artifactBlacklist = Regex("spigot-api-1\\.8\\.8(.*)\\.jar")
 
@@ -89,7 +89,7 @@ class BuildToolsPlugin: Plugin<Project> {
                     }
                 }
 
-                for (artifact in compileOnlyConfig.resolvedConfiguration.resolvedArtifacts) {
+                for (artifact in compileConfig.resolvedConfiguration.resolvedArtifacts) {
                     if(!artifactBlacklist.matches(artifact.file.name) && !artifactFileList.contains(artifact.file)) {
                         artifactFileList.add(artifact.file)
                     }
