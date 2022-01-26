@@ -3,11 +3,10 @@
   <groupId>com.pixlfox.scriptablemc</groupId>
   <artifactId>buildtools</artifactId>
   <versioning>
-    <latest>1.0.3</latest>
-    <release>1.0.3</release>
+    <latest>1.0.0-SNAPSHOT</latest>
     <versions>
-      <version>1.0.3</version>
+      <version>1.0.0-SNAPSHOT</version>
     </versions>
-    <lastUpdated>20220126050645</lastUpdated>
+    <lastUpdated>20220126050859</lastUpdated>
   </versioning>
 </metadata>
