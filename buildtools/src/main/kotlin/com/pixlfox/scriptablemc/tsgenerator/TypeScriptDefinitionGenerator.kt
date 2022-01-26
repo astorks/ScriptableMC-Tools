@@ -434,7 +434,12 @@ class TypeScriptDefinitionGenerator(
         catch (ex: NoClassDefFoundError) {
             println(
                 LoggingLevel.WARNING, "NoClassDefFoundError was thrown for a superclass on " +
-                    "${baseClass.qualifiedName} while building it's class list")
+                        "${baseClass.qualifiedName} while building it's class list")
+        }
+        catch (ex: ClassNotFoundException) {
+            println(
+                LoggingLevel.WARNING, "ClassNotFoundException was thrown for a superclass on " +
+                        "${baseClass.qualifiedName} while building it's class list")
         }
 
         try {
@@ -453,6 +458,9 @@ class TypeScriptDefinitionGenerator(
         catch (ex: NoClassDefFoundError) {
             println(LoggingLevel.WARNING, ex.toString())
         }
+        catch (ex: ClassNotFoundException) {
+            println(LoggingLevel.WARNING, ex.toString())
+        }
 
         try {
             classList.addAll(
@@ -465,6 +473,9 @@ class TypeScriptDefinitionGenerator(
             println(LoggingLevel.WARNING, ex.toString())
         }
         catch (ex: NoClassDefFoundError) {
+            println(LoggingLevel.WARNING, ex.toString())
+        }
+        catch (ex: ClassNotFoundException) {
             println(LoggingLevel.WARNING, ex.toString())
         }
 
