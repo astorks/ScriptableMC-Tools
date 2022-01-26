@@ -26,11 +26,11 @@ class TypeScriptGeneratorConfig {
     var debug: Boolean = false
     var commentTypes: Boolean = true
 
-    var includeTypes: MutableList<String> = mutableListOf("*")
+    var includeTypes: Array<String> = arrayOf("*")
 
-    var excludeTypes: MutableList<String> = mutableListOf("*.package-info")
+    var excludeTypes: Array<String> = arrayOf("*.package-info")
 
-    var functionBlacklist: MutableList<String> = mutableListOf(
+    var functionBlacklist: Array<String> = arrayOf(
         "wait",
         "equals",
         "toString",
@@ -41,7 +41,7 @@ class TypeScriptGeneratorConfig {
         "(.*?)\\\$(.*?)",
     )
 
-    val safeNames: MutableMap<String, String> = mutableMapOf(
+    val safeNames: Map<String, String> = mapOf(
         "function" to "_function",
         "yield" to "_yield",
         "arguments" to "_arguments",
@@ -51,7 +51,7 @@ class TypeScriptGeneratorConfig {
         "with" to "_with",
     )
 
-    val safeClassNames: MutableMap<String, String> = mutableMapOf(
+    val safeClassNames: Map<String, String> = mapOf(
         "Array" to "_Array",
     )
 }
@@ -123,9 +123,9 @@ class BuildToolsPlugin: Plugin<Project> {
                     exportDirectory.absoluteFile,
                     TypeScriptDefinitionGenerator.Configuration(
                         commentTypes = typescript.commentTypes,
-                        includeTypes = typescript.includeTypes.toTypedArray(),
-                        excludeTypes = typescript.excludeTypes.toTypedArray(),
-                        functionBlacklist = typescript.functionBlacklist.toTypedArray(),
+                        includeTypes = typescript.includeTypes,
+                        excludeTypes = typescript.excludeTypes,
+                        functionBlacklist = typescript.functionBlacklist,
                         safeNames = typescript.safeNames,
                         safeClassNames = typescript.safeClassNames
                     ),
