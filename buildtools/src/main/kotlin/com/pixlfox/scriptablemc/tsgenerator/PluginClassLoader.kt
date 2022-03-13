@@ -1,5 +1,7 @@
 package com.pixlfox.scriptablemc.tsgenerator
 
+import com.beust.klaxon.Json
+import com.beust.klaxon.Klaxon
 import java.io.File
 import java.io.FileInputStream
 import java.net.URLClassLoader
@@ -30,8 +32,8 @@ class PluginClassLoader(private val artifactFiles: Array<File>) :
 
     override fun getPermissions(codesource: CodeSource?): PermissionCollection = Permissions()
 
-    fun buildClassDescriptionList(isClassAllowed: (TypeScriptDefinitionGenerator.ClassDescription) -> Boolean): Array<TypeScriptDefinitionGenerator.ClassDescription> {
-        val classList: MutableList<TypeScriptDefinitionGenerator.ClassDescription> = mutableListOf()
+    fun buildClassDescriptionList(isClassAllowed: (ClassDescription) -> Boolean): Array<ClassDescription> {
+        val classList: MutableList<ClassDescription> = mutableListOf()
 
         for(artifactFile in artifactFiles) {
             val zipStream = ZipInputStream(FileInputStream(artifactFile.canonicalPath))
@@ -46,7 +48,7 @@ class PluginClassLoader(private val artifactFiles: Array<File>) :
                     val packageName = rawClassName.take(rawClassName.size - 1).joinToString(".")
 
                     if(!className.matches(classIgnoreRegex)) {
-                        classList.add(TypeScriptDefinitionGenerator.ClassDescription(packageName, className))
+                        classList.add(ClassDescription(packageName, className))
                     }
                 }
 
@@ -55,5 +57,21 @@ class PluginClassLoader(private val artifactFiles: Array<File>) :
         }
 
         return classList.filter { isClassAllowed(it) }.distinct().toTypedArray()
+    }
+
+    class ClassDescription (
+        @Json(name = "p", index = 0)
+        val packageName: String = "",
+        @Json(name = "l", index = 1)
+        val className: String = "",
+    ) {
+        override fun toString(): String =
+            if(packageName.isNotEmpty() && className.isNotEmpty()) "$packageName.$className" else ""
+
+        companion object {
+            fun fromJsonObject(classDescriptionJson: String): ClassDescription? {
+                return Klaxon().parse<ClassDescription>(classDescriptionJson)
+            }
+        }
     }
 }

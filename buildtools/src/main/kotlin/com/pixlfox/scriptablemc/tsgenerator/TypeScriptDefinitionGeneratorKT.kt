@@ -1,4 +1,4 @@
-package com.pixlfox.scriptablemc.tools
+package com.pixlfox.scriptablemc.tsgenerator
 
 import com.beust.klaxon.*
 import org.springframework.core.KotlinReflectionParameterNameDiscoverer
@@ -11,7 +11,14 @@ import kotlin.reflect.jvm.javaConstructor
 import kotlin.reflect.jvm.javaMethod
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
-class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), private val configuration: Configuration = Configuration(), private val pluginClassLoader: PluginClassLoader = PluginClassLoader.fromPluginsFolder(File(rootFolder, configuration.pluginsFolder))) {
+class TypeScriptDefinitionGeneratorKT(
+    private val rootFolder: File = File("./"),
+    private val configuration: Configuration = Configuration(),
+    private val exportFolder: File = File(rootFolder, configuration.exportFolder),
+    private val pluginClassLoader: PluginClassLoader = PluginClassLoader.fromPluginsFolder(
+        File(rootFolder, configuration.pluginsFolder)
+    )
+) {
 
     private val classList = mutableListOf<KClass<*>>()
     var loggingLevel: EnumSet<LoggingLevel> = EnumSet.of(
@@ -25,12 +32,12 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
     private val sortedClassList: Array<KClass<*>>
         get() = classList.filter { isClassAllowed(it) }.distinct().sortedBy { it.qualifiedName }.toTypedArray()
 
-    fun logging(level: EnumSet<LoggingLevel>): TypeScriptDefinitionGenerator {
+    fun logging(level: EnumSet<LoggingLevel>): TypeScriptDefinitionGeneratorKT {
         loggingLevel = level
         return this
     }
 
-    fun mkdirs(): TypeScriptDefinitionGenerator {
+    fun mkdirs(): TypeScriptDefinitionGeneratorKT {
         if(!rootFolder.exists()) {
             rootFolder.mkdirs()
         }
@@ -39,21 +46,17 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
             exportFolder.mkdirs()
         }
 
-        if(!pluginsFolder.exists()) {
-            pluginsFolder.mkdirs()
-        }
-
         return this
     }
 
-    fun clean(): TypeScriptDefinitionGenerator {
+    fun clean(): TypeScriptDefinitionGeneratorKT {
 
         deleteDirectory(exportFolder, true)
 
         return this
     }
 
-    fun buildClassList(): TypeScriptDefinitionGenerator {
+    fun buildClassList(): TypeScriptDefinitionGeneratorKT {
         val classList = mutableListOf<KClass<*>>()
 
         for (classDescription in pluginClassLoader.buildClassDescriptionList { isClassAllowed(it) }) {
@@ -69,7 +72,7 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
         return this
     }
 
-    fun debugClassList(): TypeScriptDefinitionGenerator {
+    fun debugClassList(): TypeScriptDefinitionGeneratorKT {
         for (baseClass in sortedClassList) {
             println("- ${baseClass.qualifiedName}")
         }
@@ -79,7 +82,7 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
         return this
     }
 
-    fun exportAll(): TypeScriptDefinitionGenerator {
+    fun exportAll(): TypeScriptDefinitionGeneratorKT {
         exportClassList()
         exportTypeScriptDefinitions()
         exportJavaScript()
@@ -89,24 +92,24 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
         return this
     }
 
-    fun exportClassList(): TypeScriptDefinitionGenerator {
+    fun exportClassList(): TypeScriptDefinitionGeneratorKT {
         val file = File(rootFolder, "class-list.json")
         if(file.exists()) file.delete()
         file.parentFile.mkdirs()
         file.createNewFile()
 
-        val classDescriptions = sortedClassList.map { ClassDescription(getPackageName(it), stripPackageName(it)) }.toTypedArray()
+        val classDescriptions = sortedClassList.map { PluginClassLoader.ClassDescription(getPackageName(it), stripPackageName(it)) }.toTypedArray()
         file.writeText(classDescriptions.jsonToString(true))
 
         return this
     }
 
-    fun exportTypeScriptDefinitions(): TypeScriptDefinitionGenerator {
+    fun exportTypeScriptDefinitions(): TypeScriptDefinitionGeneratorKT {
         generateTypeScriptDefinitions(sortedClassList)
         return this
     }
 
-    fun exportJavaScript(): TypeScriptDefinitionGenerator {
+    fun exportJavaScript(): TypeScriptDefinitionGeneratorKT {
         generateJavaScript(sortedClassList)
         return this
     }
@@ -114,13 +117,13 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
     private fun generateTypeScriptDefinitions(classes: Array<KClass<*>>) {
         for (baseClass in classes) {
             val file = File(exportFolder, "${getPackageName(baseClass).replace(".", "/")}/${stripPackageName(baseClass)}.d.ts")
+            println(LoggingLevel.INFO, "${baseClass.qualifiedName} -> ${file.path}")
+
             if(file.exists()) file.delete()
             file.parentFile.mkdirs()
             file.createNewFile()
 
             file.writeText(generateTypeScriptDefinitionSource(baseClass))
-
-            println(LoggingLevel.INFO, "${baseClass.qualifiedName} -> ${file.path}")
         }
     }
 
@@ -161,16 +164,10 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
     private val functionBlacklistRegex: Regex
         get() = Regex("(${configuration.functionBlacklist.joinToString("|")})")
 
-    private val exportFolder: File
-        get() = File(rootFolder, configuration.exportFolder)
-
-    private val pluginsFolder: File
-        get() = File(rootFolder, configuration.pluginsFolder)
-
     private val systemClassLoader: ClassLoader
         get() = javaClass.classLoader
 
-    private fun loadClass(classDescription: ClassDescription): KClass<*>? {
+    private fun loadClass(classDescription: PluginClassLoader.ClassDescription): KClass<*>? {
         val className = classDescription.toString()
         if(!isClassAllowed(classDescription)) return null
         val cachedClass = classList.firstOrNull { it.qualifiedName == className }
@@ -275,7 +272,7 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
     private fun isClassExcluded(baseClass: KClass<*>): Boolean =
         isClassExcluded("${getPackageName(baseClass)}.${stripPackageName(baseClass)}")
 
-    private fun isClassExcluded(classDef: ClassDescription): Boolean = isClassExcluded(classDef.toString())
+    private fun isClassExcluded(classDef: PluginClassLoader.ClassDescription): Boolean = isClassExcluded(classDef.toString())
 
     private fun isClassExcluded(qualifiedName: String?): Boolean =
         if(qualifiedName.isNullOrEmpty()) true else qualifiedName.matches(excludeTypesRegex)
@@ -283,12 +280,12 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
     private fun isClassIncluded(baseClass: KClass<*>): Boolean =
         isClassIncluded("${getPackageName(baseClass)}.${stripPackageName(baseClass)}")
 
-    private fun isClassIncluded(classDef: ClassDescription): Boolean = isClassIncluded(classDef.toString())
+    private fun isClassIncluded(classDef: PluginClassLoader.ClassDescription): Boolean = isClassIncluded(classDef.toString())
 
     private fun isClassIncluded(qualifiedName: String?): Boolean =
         if(qualifiedName.isNullOrEmpty()) true else qualifiedName.matches(includeTypesRegex)
 
-    private fun isClassAllowed(classDef: ClassDescription): Boolean =
+    private fun isClassAllowed(classDef: PluginClassLoader.ClassDescription): Boolean =
         isClassIncluded(classDef) && !isClassExcluded(classDef)
 
     private fun isClassAllowed(qualifiedName: String?): Boolean =
@@ -437,7 +434,12 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
         catch (ex: NoClassDefFoundError) {
             println(
                 LoggingLevel.WARNING, "NoClassDefFoundError was thrown for a superclass on " +
-                    "${baseClass.qualifiedName} while building it's class list")
+                        "${baseClass.qualifiedName} while building it's class list")
+        }
+        catch (ex: ClassNotFoundException) {
+            println(
+                LoggingLevel.WARNING, "ClassNotFoundException was thrown for a superclass on " +
+                        "${baseClass.qualifiedName} while building it's class list")
         }
 
         try {
@@ -456,6 +458,9 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
         catch (ex: NoClassDefFoundError) {
             println(LoggingLevel.WARNING, ex.toString())
         }
+        catch (ex: ClassNotFoundException) {
+            println(LoggingLevel.WARNING, ex.toString())
+        }
 
         try {
             classList.addAll(
@@ -468,6 +473,9 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
             println(LoggingLevel.WARNING, ex.toString())
         }
         catch (ex: NoClassDefFoundError) {
+            println(LoggingLevel.WARNING, ex.toString())
+        }
+        catch (ex: ClassNotFoundException) {
             println(LoggingLevel.WARNING, ex.toString())
         }
 
@@ -606,17 +614,19 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
 
                 val enumConstants = baseClass.java.enumConstants
 
-                if(enumConstants is Array<*>) {
-                    for (enumConstant in enumConstants) {
-                        if(enumConstant is Enum<*>) {
-                            tsSource += "${linePrefix}\tpublic static get ${enumConstant.name}(): ${
-                                stripPackageName(
-                                    baseClass
-                                )
-                            }\n"
-                        }
+                for (enumConstant in enumConstants) {
+                    try {
+                        tsSource += "${linePrefix}\tpublic static get ${(enumConstant as Enum<*>).name}(): ${
+                            stripPackageName(
+                                baseClass
+                            )
+                        }\n"
+                    }
+                    catch (ex: java.lang.Exception) {
+                        println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration_Enum(${baseClass.qualifiedName}): $ex")
                     }
                 }
+
             }
             else if(baseClass.java.isInterface) {
                 tsSource = "/* Interface */\n$tsSource"
@@ -667,16 +677,16 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
     }
 
     companion object {
-        fun fromConfigFile(configFilePath: String): TypeScriptDefinitionGenerator =
+        fun fromConfigFile(configFilePath: String): TypeScriptDefinitionGeneratorKT =
             fromConfigFile(File(configFilePath))
 
-        fun fromConfigFile(configFile: File): TypeScriptDefinitionGenerator =
+        fun fromConfigFile(configFile: File): TypeScriptDefinitionGeneratorKT =
             fromConfigStream(configFile.parent, configFile.inputStream())
 
-        fun fromConfigStream(rootFolderPath: String, inputStream: InputStream): TypeScriptDefinitionGenerator {
+        fun fromConfigStream(rootFolderPath: String, inputStream: InputStream): TypeScriptDefinitionGeneratorKT {
             val rootFolder = File(rootFolderPath)
             val configuration = Klaxon().parse<Configuration>(inputStream)!!
-            return TypeScriptDefinitionGenerator(rootFolder, configuration)
+            return TypeScriptDefinitionGeneratorKT(rootFolder, configuration)
         }
 
         fun Any.jsonToString(prettyPrint: Boolean = true): String {
@@ -771,22 +781,6 @@ class TypeScriptDefinitionGenerator(private val rootFolder: File = File("./"), p
         companion object {
             fun fromJsonObject(configJson: String): Configuration? {
                 return Klaxon().parse<Configuration>(configJson)
-            }
-        }
-    }
-
-    class ClassDescription (
-        @Json(name = "p", index = 0)
-        val packageName: String = "",
-        @Json(name = "l", index = 1)
-        val className: String = "",
-    ) {
-        override fun toString(): String =
-            if(packageName.isNotEmpty() && className.isNotEmpty()) "$packageName.$className" else ""
-
-        companion object {
-            fun fromJsonObject(classDescriptionJson: String): ClassDescription? {
-                return Klaxon().parse<ClassDescription>(classDescriptionJson)
             }
         }
     }

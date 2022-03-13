@@ -4,11 +4,10 @@ import com.beust.klaxon.*
 import org.springframework.core.KotlinReflectionParameterNameDiscoverer
 import java.io.File
 import java.io.InputStream
+import java.lang.reflect.Method
+import java.lang.reflect.Modifier
+import java.lang.reflect.Parameter
 import java.util.*
-import kotlin.reflect.*
-import kotlin.reflect.full.*
-import kotlin.reflect.jvm.javaConstructor
-import kotlin.reflect.jvm.javaMethod
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
 class TypeScriptDefinitionGenerator(
@@ -20,7 +19,7 @@ class TypeScriptDefinitionGenerator(
     )
 ) {
 
-    private val classList = mutableListOf<KClass<*>>()
+    private val classList = mutableListOf<Class<*>>()
     var loggingLevel: EnumSet<LoggingLevel> = EnumSet.of(
 //        LoggingLevel.DEBUG,
         LoggingLevel.INFO,
@@ -29,8 +28,8 @@ class TypeScriptDefinitionGenerator(
         LoggingLevel.FATAL,
     )
 
-    private val sortedClassList: Array<KClass<*>>
-        get() = classList.filter { isClassAllowed(it) }.distinct().sortedBy { it.qualifiedName }.toTypedArray()
+    private val sortedClassList: Array<Class<*>>
+        get() = classList.filter { isClassAllowed(it) }.distinct().sortedBy { it.name }.toTypedArray()
 
     fun logging(level: EnumSet<LoggingLevel>): TypeScriptDefinitionGenerator {
         loggingLevel = level
@@ -57,7 +56,7 @@ class TypeScriptDefinitionGenerator(
     }
 
     fun buildClassList(): TypeScriptDefinitionGenerator {
-        val classList = mutableListOf<KClass<*>>()
+        val classList = mutableListOf<Class<*>>()
 
         for (classDescription in pluginClassLoader.buildClassDescriptionList { isClassAllowed(it) }) {
             val loadedClass = loadClass(classDescription)
@@ -74,7 +73,7 @@ class TypeScriptDefinitionGenerator(
 
     fun debugClassList(): TypeScriptDefinitionGenerator {
         for (baseClass in sortedClassList) {
-            println("- ${baseClass.qualifiedName}")
+            println("- ${baseClass.name}")
         }
 
         println("ClassList Size: ${sortedClassList.size}")
@@ -98,7 +97,7 @@ class TypeScriptDefinitionGenerator(
         file.parentFile.mkdirs()
         file.createNewFile()
 
-        val classDescriptions = sortedClassList.map { ClassDescription(getPackageName(it), stripPackageName(it)) }.toTypedArray()
+        val classDescriptions = sortedClassList.map { PluginClassLoader.ClassDescription(getPackageName(it), stripPackageName(it)) }.toTypedArray()
         file.writeText(classDescriptions.jsonToString(true))
 
         return this
@@ -114,10 +113,10 @@ class TypeScriptDefinitionGenerator(
         return this
     }
 
-    private fun generateTypeScriptDefinitions(classes: Array<KClass<*>>) {
+    private fun generateTypeScriptDefinitions(classes: Array<Class<*>>) {
         for (baseClass in classes) {
             val file = File(exportFolder, "${getPackageName(baseClass).replace(".", "/")}/${stripPackageName(baseClass)}.d.ts")
-            println(LoggingLevel.INFO, "${baseClass.qualifiedName} -> ${file.path}")
+            println(LoggingLevel.INFO, "${baseClass.name} -> ${file.path}")
 
             if(file.exists()) file.delete()
             file.parentFile.mkdirs()
@@ -127,7 +126,7 @@ class TypeScriptDefinitionGenerator(
         }
     }
 
-    private fun generateJavaScript(classes: Array<KClass<*>>) {
+    private fun generateJavaScript(classes: Array<Class<*>>) {
         for (baseClass in classes) {
             val file = File(
                 exportFolder, "${getPackageName(baseClass).replace(".", "/")}/" +
@@ -139,7 +138,7 @@ class TypeScriptDefinitionGenerator(
 
             file.writeText(generateJavaScriptSource(baseClass))
 
-            println(LoggingLevel.INFO, "${baseClass.qualifiedName} -> ${file.path}")
+            println(LoggingLevel.INFO, "${baseClass.name} -> ${file.path}")
         }
     }
 
@@ -167,14 +166,14 @@ class TypeScriptDefinitionGenerator(
     private val systemClassLoader: ClassLoader
         get() = javaClass.classLoader
 
-    private fun loadClass(classDescription: ClassDescription): KClass<*>? {
+    private fun loadClass(classDescription: PluginClassLoader.ClassDescription): Class<*>? {
         val className = classDescription.toString()
         if(!isClassAllowed(classDescription)) return null
-        val cachedClass = classList.firstOrNull { it.qualifiedName == className }
+        val cachedClass = classList.firstOrNull { it.name == className }
         if(cachedClass != null) return cachedClass
 
         try {
-            return pluginClassLoader.loadClass(className).kotlin
+            return pluginClassLoader.loadClass(className)
         }
         catch (ex: ClassNotFoundException) {
             println(LoggingLevel.WARNING, ex.toString())
@@ -206,94 +205,52 @@ class TypeScriptDefinitionGenerator(
 
     private fun safePackageName(name: String): String = name
 
-    @OptIn(ExperimentalStdlibApi::class)
-    private fun toTypeScriptType(type: KType): String {
-        val isArray = if(type.classifier is KClass<*>) {
-            val typeClass = type.classifier as KClass<*>
-            typeClass.qualifiedName == "kotlin.Array" ||
-                    typeClass.qualifiedName == "kotlin.collections.List" ||
-                    typeClass.qualifiedName == "kotlin.collections.Set"
-        } else false
-
-        val isClass = if(type.classifier is KClass<*>) {
-            val typeClass = type.classifier as KClass<*>
-            typeClass.qualifiedName == "java.lang.Class"
-        } else false
-
-        return when {
-            type == typeOf<Any>() -> "any"
-            type == typeOf<Unit>() -> "void"
-            type == typeOf<Boolean>() -> "boolean"
-            type == typeOf<String>() -> "string"
-            type == typeOf<Byte>() -> if(configuration.commentTypes) "number/*(Byte)*/" else "number"
-            type == typeOf<Short>() -> if(configuration.commentTypes) "number/*(Short)*/" else "number"
-            type == typeOf<Int>() -> if(configuration.commentTypes) "number/*(Int)*/" else "number"
-            type == typeOf<Long>() -> if(configuration.commentTypes) "number/*(Long)*/" else "number"
-            type == typeOf<Float>() -> if(configuration.commentTypes) "number/*(Float)*/" else "number"
-            type == typeOf<Double>() -> if(configuration.commentTypes) "number/*(Double)*/" else "number"
-            type == typeOf<IntArray>() -> if(configuration.commentTypes) "Array<number/*(Int)*/>" else "Array<number>"
-            type == typeOf<Char>() -> if(configuration.commentTypes) "string/*(Char)*/" else "string"
-            isClass -> "{ new (...args: any[]): ${toTypeScriptType(type.arguments.first().type?.classifier)}; }"
-            isArray -> "Array<${toTypeScriptType(type.arguments.first().type?.classifier)}>"
-            else -> toTypeScriptType(type.classifier)
-        }
-    }
-
-    private fun toTypeScriptType(classifier: KClassifier?): String {
-        return when {
-            (classifier is KClass<*>) -> toTypeScriptType(classifier)
-//            configuration.commentTypes -> "any/*???: ${classifier?.javaClass?.kotlin?.qualifiedName}*/"
-            else -> "any"
-        }
-    }
-
-    private fun toTypeScriptType(baseClass: KClass<*>): String {
+    private fun toTypeScriptType(baseClass: Class<*>): String {
         val className = stripPackageName(baseClass)
 
         return when {
-            baseClass.qualifiedName == "kotlin.Any" -> "any"
-            baseClass.qualifiedName == "kotlin.Unit" -> "void"
-            baseClass.qualifiedName == "kotlin.Boolean" -> "boolean"
-            baseClass.qualifiedName == "kotlin.String" -> "string"
-            baseClass.qualifiedName == "kotlin.Byte" -> if(configuration.commentTypes) "number/*(Byte)*/" else "number"
-            baseClass.qualifiedName == "kotlin.Short" -> if(configuration.commentTypes) "number/*(Short)*/" else "number"
-            baseClass.qualifiedName == "kotlin.Int" -> if(configuration.commentTypes) "number/*(Int)*/" else "number"
-            baseClass.qualifiedName == "kotlin.Long" -> if(configuration.commentTypes) "number/*(Long)*/" else "number"
-            baseClass.qualifiedName == "kotlin.Float" -> if(configuration.commentTypes) "number/*(Float)*/" else "number"
-            baseClass.qualifiedName == "kotlin.Double" -> if(configuration.commentTypes) "number/*(Double)*/" else "number"
-            baseClass.qualifiedName == "kotlin.IntArray" -> if(configuration.commentTypes) "Array<number/*(Int)*/>" else "Array<number>"
-            baseClass.qualifiedName == "kotlin.LongArray" -> if(configuration.commentTypes) "Array<number/*(Long)*/>" else "Array<number>"
-            baseClass.qualifiedName == "kotlin.Char" -> if(configuration.commentTypes) "string/*(Char)*/" else "string"
+            baseClass.name == "java.lang.Object" -> "any"
+            baseClass.name == "void" -> "void"
+            baseClass.name == "boolean" -> "boolean"
+            baseClass.name == "java.lang.String" -> "string"
+            baseClass.name == "byte" -> if(configuration.commentTypes) "number/*(Byte)*/" else "number"
+            baseClass.name == "short" -> if(configuration.commentTypes) "number/*(Short)*/" else "number"
+            baseClass.name == "int" -> if(configuration.commentTypes) "number/*(Int)*/" else "number"
+            baseClass.name == "long" -> if(configuration.commentTypes) "number/*(Long)*/" else "number"
+            baseClass.name == "float" -> if(configuration.commentTypes) "number/*(Float)*/" else "number"
+            baseClass.name == "double" -> if(configuration.commentTypes) "number/*(Double)*/" else "number"
+            baseClass.name == "kotlin.IntArray" -> if(configuration.commentTypes) "Array<number/*(Int)*/>" else "Array<number>"
+            baseClass.name == "kotlin.LongArray" -> if(configuration.commentTypes) "Array<number/*(Long)*/>" else "Array<number>"
+            baseClass.name == "kotlin.Char" -> if(configuration.commentTypes) "string/*(Char)*/" else "string"
             isClassAllowed(baseClass) -> safeClassName(className)
-            else -> if(configuration.commentTypes)  "any/*(${baseClass.qualifiedName})*/" else "any"
+            else -> if(configuration.commentTypes)  "any/*(${baseClass.name})*/" else "any"
         }
     }
 
-    private fun isClassExcluded(baseClass: KClass<*>): Boolean =
+    private fun isClassExcluded(baseClass: Class<*>): Boolean =
         isClassExcluded("${getPackageName(baseClass)}.${stripPackageName(baseClass)}")
 
-    private fun isClassExcluded(classDef: ClassDescription): Boolean = isClassExcluded(classDef.toString())
+    private fun isClassExcluded(classDef: PluginClassLoader.ClassDescription): Boolean = isClassExcluded(classDef.toString())
 
     private fun isClassExcluded(qualifiedName: String?): Boolean =
         if(qualifiedName.isNullOrEmpty()) true else qualifiedName.matches(excludeTypesRegex)
 
-    private fun isClassIncluded(baseClass: KClass<*>): Boolean =
+    private fun isClassIncluded(baseClass: Class<*>): Boolean =
         isClassIncluded("${getPackageName(baseClass)}.${stripPackageName(baseClass)}")
 
-    private fun isClassIncluded(classDef: ClassDescription): Boolean = isClassIncluded(classDef.toString())
+    private fun isClassIncluded(classDef: PluginClassLoader.ClassDescription): Boolean = isClassIncluded(classDef.toString())
 
     private fun isClassIncluded(qualifiedName: String?): Boolean =
         if(qualifiedName.isNullOrEmpty()) true else qualifiedName.matches(includeTypesRegex)
 
-    private fun isClassAllowed(classDef: ClassDescription): Boolean =
+    private fun isClassAllowed(classDef: PluginClassLoader.ClassDescription): Boolean =
         isClassIncluded(classDef) && !isClassExcluded(classDef)
 
     private fun isClassAllowed(qualifiedName: String?): Boolean =
         isClassIncluded(qualifiedName) && !isClassExcluded(qualifiedName)
 
-    private fun isClassAllowed(baseClass: KClass<*>): Boolean {
+    private fun isClassAllowed(baseClass: Class<*>): Boolean {
         try {
-            if (baseClass.isCompanion) return false
             if (!isClassIncluded(baseClass) || isClassExcluded(baseClass)) return false
             return true
         }
@@ -305,98 +262,65 @@ class TypeScriptDefinitionGenerator(
         }
     }
 
-    private fun isInnerClass(baseClass: KClass<*>): Boolean = baseClass.isInner || baseClass.java.isMemberClass
+    private fun isInnerClass(baseClass: Class<*>): Boolean = baseClass.isMemberClass
 
-    private fun stripPackageName(baseClass: KClass<*>): String {
-        val qualifiedName = baseClass.java.name ?: return ""
+    private fun stripPackageName(baseClass: Class<*>): String {
+        val qualifiedName = baseClass.name ?: return ""
         return safeClassName(qualifiedName.split('.').last())
     }
 
-    private fun getPackageName(baseClass: KClass<*>): String {
-        val qualifiedName = baseClass.java.name ?: return ""
+    private fun getPackageName(baseClass: Class<*>): String {
+        val qualifiedName = baseClass.name ?: return ""
         return safePackageName(qualifiedName.split('.').dropLast(1).joinToString("."))
     }
 
-    private fun addAllClasses(baseClasses: List<KClass<*>>) = addAllClasses(baseClasses.toTypedArray())
+    private fun addAllClasses(baseClasses: List<Class<*>>) = addAllClasses(baseClasses.toTypedArray())
 
-    private fun addAllClasses(baseClasses: Array<KClass<*>>) {
+    private fun addAllClasses(baseClasses: Array<Class<*>>) {
         for (baseClass in baseClasses)  addAllClasses(baseClass)
     }
 
-    private fun addAllClasses(baseClass: KClass<*>) {
+    private fun addAllClasses(baseClass: Class<*>) {
         if(classList.contains(baseClass) || !isClassAllowed(baseClass)) return
 
         addClasses(baseClass)
         addAllClasses(buildClassList(baseClass))
     }
 
-    private fun addClasses(baseClasses: List<KClass<*>>) = addClasses(baseClasses.toTypedArray())
+    private fun addClasses(baseClasses: List<Class<*>>) = addClasses(baseClasses.toTypedArray())
 
-    private fun addClasses(baseClasses: Array<KClass<*>>) {
+    private fun addClasses(baseClasses: Array<Class<*>>) {
         for (baseClass in baseClasses)  addClasses(baseClass)
     }
 
-    private fun addClasses(baseClass: KClass<*>) {
+    private fun addClasses(baseClass: Class<*>) {
         if(classList.contains(baseClass) || !isClassAllowed(baseClass)) return
 
-        println(LoggingLevel.DEBUG,"Adding ${baseClass.qualifiedName} to the class list.")
+        println(LoggingLevel.DEBUG,"Adding ${baseClass.name} to the class list.")
         classList.add(baseClass)
     }
 
-    private fun getClassFromType(type: KType?): KClass<*>? {
-        if(type == null) return null
+    private fun buildClassList(baseClasses: Array<Class<*>>, ignoreWhitelist: Boolean = false): Array<Class<*>> {
+        val classList = mutableListOf<Class<*>>()
 
-        val typeClassifier = type.classifier
-        if (typeClassifier is KClass<*>) {
-            return typeClassifier
-        }
+        for (baseClass in baseClasses) {
 
-        return null
-    }
-
-    private fun getClassesFromType(type: KType?): Array<KClass<*>> {
-        val classList = mutableListOf<KClass<*>>()
-
-        if(type != null) {
-            for (typeArg in type.arguments) {
-                val typeArgClass = getClassFromType(typeArg.type)
-                if (typeArgClass != null) classList.add(typeArgClass)
+            if(baseClass.superclass != null) {
+                classList.add(baseClass.superclass)
             }
 
-            val mainClass = getClassFromType(type)
-            if (mainClass != null) classList.add(mainClass)
-        }
-
-        return classList.toTypedArray()
-    }
-
-    private fun buildClassList(functions: Collection<KFunction<*>> = listOf(), properties: Collection<KProperty1<*, *>> = listOf(), ignoreWhitelist: Boolean = false): Array<KClass<*>> {
-        val classList = mutableListOf<KClass<*>>()
-
-        try {
-            for(function in functions) {
-                if(function.visibility == KVisibility.PUBLIC && !function.name.matches(functionBlacklistRegex)) {
-                    classList.addAll(getClassesFromType(function.returnType))
-
-                    for (_parameter in function.parameters) {
-                        classList.addAll(getClassesFromType(_parameter.type))
-                    }
-                }
+            for(constructor in baseClass.constructors) {
+                classList.addAll(constructor.parameterTypes)
             }
-        }
-        catch (ex: NoClassDefFoundError){
-            println(LoggingLevel.WARNING, ex.toString())
-        }
 
-        try {
-            for(property in properties) {
-                if(property.visibility == KVisibility.PUBLIC) {
-                    classList.addAll(getClassesFromType(property.returnType))
-                }
+            for(method in baseClass.methods) {
+                classList.add(method.returnType)
+                classList.addAll(method.parameterTypes)
             }
-        }
-        catch (ex: NoClassDefFoundError){
-            println(LoggingLevel.WARNING, ex.toString())
+
+            for(field in baseClass.fields) {
+                classList.add(field.type)
+            }
         }
 
         return if(ignoreWhitelist) {
@@ -406,77 +330,32 @@ class TypeScriptDefinitionGenerator(
         }
     }
 
-    private fun buildClassList(baseClasses: Array<KClass<*>>, ignoreWhitelist: Boolean = false): Array<KClass<*>> {
-        val classList = mutableListOf<KClass<*>>()
-
-        for (baseClass in baseClasses) {
-            classList.addAll(buildClassList(baseClass, ignoreWhitelist))
-        }
-
-        return classList.distinct().toTypedArray()
-    }
-
-    private fun buildClassList(baseClass: KClass<*>, ignoreWhitelist: Boolean = false): Array<KClass<*>> {
-        val classList = mutableListOf<KClass<*>>()
+    private fun buildClassList(baseClass: Class<*>, ignoreWhitelist: Boolean = false): Array<Class<*>> {
+        val classList = mutableListOf<Class<*>>()
 
         if(!isClassAllowed(baseClass)) return arrayOf()
 
-        try {
-            for (_superclass in baseClass.superclasses) {
-                if (!classList.contains(_superclass)) {
-                    classList.add(_superclass)
-                }
-            }
-        }
-        catch (ex: IncompatibleClassChangeError) {
-            println(LoggingLevel.WARNING, ex.toString())
-        }
-        catch (ex: NoClassDefFoundError) {
-            println(
-                LoggingLevel.WARNING, "NoClassDefFoundError was thrown for a superclass on " +
-                        "${baseClass.qualifiedName} while building it's class list")
-        }
-        catch (ex: ClassNotFoundException) {
-            println(
-                LoggingLevel.WARNING, "ClassNotFoundException was thrown for a superclass on " +
-                        "${baseClass.qualifiedName} while building it's class list")
+        classList.add(baseClass)
+
+        if(baseClass.superclass != null) {
+            classList.add(baseClass.superclass)
         }
 
-        try {
-            val companionObject = baseClass.companionObject
-            if (companionObject != null) {
-                classList.addAll(
-                    buildClassList(
-                        functions = companionObject.memberFunctions
-                    )
-                )
-            }
-        }
-        catch (ex: IncompatibleClassChangeError) {
-            println(LoggingLevel.WARNING, ex.toString())
-        }
-        catch (ex: NoClassDefFoundError) {
-            println(LoggingLevel.WARNING, ex.toString())
-        }
-        catch (ex: ClassNotFoundException) {
-            println(LoggingLevel.WARNING, ex.toString())
+        for(baseInterface in baseClass.interfaces) {
+            classList.add(baseInterface)
         }
 
-        try {
-            classList.addAll(
-                buildClassList(
-                    functions = baseClass.constructors + baseClass.staticFunctions + baseClass.memberFunctions
-                )
-            )
+        for(constructor in baseClass.constructors) {
+            classList.addAll(constructor.parameterTypes)
         }
-        catch (ex: IncompatibleClassChangeError) {
-            println(LoggingLevel.WARNING, ex.toString())
+
+        for(method in baseClass.methods) {
+            classList.add(method.returnType)
+            classList.addAll(method.parameterTypes)
         }
-        catch (ex: NoClassDefFoundError) {
-            println(LoggingLevel.WARNING, ex.toString())
-        }
-        catch (ex: ClassNotFoundException) {
-            println(LoggingLevel.WARNING, ex.toString())
+
+        for(field in baseClass.fields) {
+            classList.add(field.type)
         }
 
         return if(ignoreWhitelist) {
@@ -486,17 +365,87 @@ class TypeScriptDefinitionGenerator(
         }
     }
 
-    private fun generateTypeScriptDefinitionSource(baseClass: KClass<*>): String =
+//    private fun buildClassList(baseClass: KClass<*>, ignoreWhitelist: Boolean = false): Array<KClass<*>> {
+//        val classList = mutableListOf<KClass<*>>()
+//
+//        if(!isClassAllowed(baseClass)) return arrayOf()
+//
+//        try {
+//            for (_superclass in baseClass.superclasses) {
+//                if (!classList.contains(_superclass)) {
+//                    classList.add(_superclass)
+//                }
+//            }
+//        }
+//        catch (ex: IncompatibleClassChangeError) {
+//            println(LoggingLevel.WARNING, ex.toString())
+//        }
+//        catch (ex: NoClassDefFoundError) {
+//            println(
+//                LoggingLevel.WARNING, "NoClassDefFoundError was thrown for a superclass on " +
+//                        "${baseClass.qualifiedName} while building it's class list")
+//        }
+//        catch (ex: ClassNotFoundException) {
+//            println(
+//                LoggingLevel.WARNING, "ClassNotFoundException was thrown for a superclass on " +
+//                        "${baseClass.qualifiedName} while building it's class list")
+//        }
+//
+//        try {
+//            val companionObject = baseClass.companionObject
+//            if (companionObject != null) {
+//                classList.addAll(
+//                    buildClassList(
+//                        functions = companionObject.memberFunctions
+//                    )
+//                )
+//            }
+//        }
+//        catch (ex: IncompatibleClassChangeError) {
+//            println(LoggingLevel.WARNING, ex.toString())
+//        }
+//        catch (ex: NoClassDefFoundError) {
+//            println(LoggingLevel.WARNING, ex.toString())
+//        }
+//        catch (ex: ClassNotFoundException) {
+//            println(LoggingLevel.WARNING, ex.toString())
+//        }
+//
+//        try {
+//            classList.addAll(
+//                buildClassList(
+//                    functions = baseClass.constructors + baseClass.staticFunctions + baseClass.memberFunctions
+//                )
+//            )
+//        }
+//        catch (ex: IncompatibleClassChangeError) {
+//            println(LoggingLevel.WARNING, ex.toString())
+//        }
+//        catch (ex: NoClassDefFoundError) {
+//            println(LoggingLevel.WARNING, ex.toString())
+//        }
+//        catch (ex: ClassNotFoundException) {
+//            println(LoggingLevel.WARNING, ex.toString())
+//        }
+//
+//        return if(ignoreWhitelist) {
+//            classList.distinct().toTypedArray()
+//        } else {
+//            classList.distinct().filter { isClassAllowed(it) }.toTypedArray()
+//        }
+//    }
+
+    private fun generateTypeScriptDefinitionSource(baseClass: Class<*>): String =
         "${generateTypeScriptImports(baseClass)}\n\n" +
                 generateTypeScriptClassDeclaration(baseClass)
 
-    private fun generateJavaScriptSource(baseClass: KClass<*>): String =
-        "export default ${stripPackageName(baseClass)} = Java.type('${baseClass.qualifiedName}');"
+    private fun generateJavaScriptSource(baseClass: Class<*>): String =
+        "export default ${stripPackageName(baseClass)} = Java.type('${baseClass.name}');"
 
-    private fun generateTypeScriptImports(baseClass: KClass<*>): String =
+    private fun generateTypeScriptImports(baseClass: Class<*>): String =
         generateTypeScriptImports(baseClass, buildClassList(baseClass))
 
-    private fun generateTypeScriptImports(baseClass: KClass<*>?, importClasses: Array<KClass<*>>, keyword: String = "import"): String {
+    private fun generateTypeScriptImports(baseClass: Class<*>?, importClasses: Array<Class<*>>, keyword: String = "import"): String {
         if(baseClass == null && importClasses.isEmpty()) return ""
         val basePackageName = getPackageName(baseClass ?: importClasses.first())
         val baseClassFolderUri = File(exportFolder, basePackageName.replace('.', '/')).absoluteFile.toURI()
@@ -530,138 +479,114 @@ class TypeScriptDefinitionGenerator(
         return tsSource
     }
 
-    private fun generateTypeScriptParameters(function: KFunction<*>, constructor: Boolean = false): String {
-        val parameters = function.parameters
+    private fun generateTypeScriptParameters(parameters: Array<Parameter>, constructor: Boolean = false): String {
         if(parameters.isEmpty()) return ""
 
         val parameterList = mutableListOf<String>()
         var parameterNames: Array<String>? = null
-
-        if(constructor) {
-            try {
-                val jConstructor = function.javaConstructor
-                if(jConstructor != null) {
-                    parameterNames = KotlinReflectionParameterNameDiscoverer().getParameterNames(jConstructor)
-                }
-            }
-            catch (ex: Exception) {
-                println(LoggingLevel.ERROR, ex.toString())
-            }
-        }
-        else {
-            try {
-                val jMethod = function.javaMethod
-                if(jMethod != null) {
-                    parameterNames = KotlinReflectionParameterNameDiscoverer().getParameterNames(jMethod)
-                }
-            }
-            catch (ex: Exception) {
-                println(LoggingLevel.ERROR, ex.toString())
-            }
-        }
 
         for((index, parameter) in parameters.filter { it.name != null }.withIndex()) {
             var parameterName = if(parameterNames != null) parameterNames.getOrNull(index) else parameter.name
             if(parameterName == null) parameterName = parameter.name
 
             parameterList.add(
-                safeName(parameterName.orEmpty()) +
-                "${if(parameter.isOptional) "?" else ""}: " +
-                toTypeScriptType(parameter.type)
+                safeName(parameterName.orEmpty()) + ": " + toTypeScriptType(parameter.type)
             )
         }
 
         return parameterList.joinToString(", ")
     }
 
-    private fun generateTypeScriptClassExtends(baseClass: KClass<*>): String {
-        val superclasses = baseClass.superclasses.filter { isClassAllowed(it) }
-        if(superclasses.isEmpty()) return ""
-        return " implements ${superclasses.joinToString(", ") { toTypeScriptType(it) }}"
+    private fun generateTypeScriptClassExtends(baseClass: Class<*>): String {
+        if(baseClass.superclass == null || !isClassAllowed(baseClass.superclass)) return ""
+        return " implements ${toTypeScriptType(baseClass.superclass) }"
     }
 
-    private fun generateTypeScriptFunctionDeclaration(function: KFunction<*>, modifiers: String = ""): String {
-        return  "${modifiers}${safeName(function.name)}" +
-                "(${generateTypeScriptParameters(function)})" +
-                ": ${toTypeScriptType(function.returnType)};"
+    private fun generateTypeScriptFunctionDeclaration(method: Method, modifiers: String = ""): String {
+        return  "${modifiers}${safeName(method.name)}" +
+                "(${generateTypeScriptParameters(method.parameters)})" +
+                ": ${toTypeScriptType(method.returnType)};"
     }
 
-    private fun generateTypeScriptFunctionDeclarations(functions: Collection<KFunction<*>>, linePrefix: String = "", modifiers: String = ""): String {
+    private fun generateTypeScriptFunctionDeclarations(baseClass: Class<*>, linePrefix: String = ""): String {
         var source = ""
 
-        try {
-            for (function in functions.filter {
-                it.visibility == KVisibility.PUBLIC &&
-                        !it.name.matches(functionBlacklistRegex)
-            }.sortedWith(compareBy({it.name}, {it.parameters.size}))) {
-                source += "${linePrefix}\t${generateTypeScriptFunctionDeclaration(function, modifiers)}\n"
+
+        for (method in baseClass.methods.sortedWith(compareBy({it.name}, {it.parameters.size}))) {
+            var modifiers = ""
+
+            if(Modifier.isPublic(method.modifiers)) {
+                modifiers += "public "
             }
-        }
-        catch (ex: NoClassDefFoundError) {
-            println(LoggingLevel.WARNING, ex.toString())
+            if(Modifier.isStatic(method.modifiers)) {
+                modifiers += "static "
+            }
+
+            source += "${linePrefix}\t${modifiers}${generateTypeScriptFunctionDeclaration(method)}\n"
         }
 
         return source
     }
 
-    private fun generateTypeScriptClassDeclaration(baseClass: KClass<*>, linePrefix: String = ""): String {
+    private fun generateTypeScriptClassDeclaration(baseClass: Class<*>, linePrefix: String = ""): String {
         var tsSource =
             "${linePrefix}export declare class ${stripPackageName(baseClass)}${generateTypeScriptClassExtends(baseClass)} {\n"
 
         try {
-            if (baseClass.java.isEnum) {
+            if (baseClass.isEnum) {
                 tsSource = "/* Enum */\n$tsSource"
 
-                val enumConstants = baseClass.java.enumConstants
+                val enumConstants = baseClass.enumConstants
 
-                if(enumConstants is Array<*>) {
-                    for (enumConstant in enumConstants) {
-                        if(enumConstant is Enum<*>) {
-                            tsSource += "${linePrefix}\tpublic static get ${enumConstant.name}(): ${
-                                stripPackageName(
-                                    baseClass
-                                )
-                            }\n"
-                        }
+                for (enumConstant in enumConstants) {
+                    try {
+                        tsSource += "${linePrefix}\tpublic static get ${(enumConstant as Enum<*>).name}(): ${
+                            stripPackageName(
+                                baseClass
+                            )
+                        }\n"
+                    }
+                    catch (ex: java.lang.Exception) {
+                        println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration_Enum(${baseClass.name}): $ex")
                     }
                 }
+
             }
-            else if(baseClass.java.isInterface) {
+            else if(baseClass.isInterface) {
                 tsSource = "/* Interface */\n$tsSource"
             }
         }
         catch (ex: NullPointerException) {
-            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.qualifiedName}): $ex")
+            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.name}): $ex")
         }
         catch (ex: NoSuchMethodError) {
-            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.qualifiedName}): $ex")
+            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.name}): $ex")
         }
         catch (ex: NoClassDefFoundError) {
-            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.qualifiedName}): $ex")
+            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.name}): $ex")
         }
         catch (ex: Exception) {
-            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.qualifiedName}): $ex")
+            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.name}): $ex")
         }
 
 
         try {
             for (constructor in baseClass.constructors.sortedWith(compareBy({it.name}, {it.parameters.size}))) {
-                if (constructor.visibility == KVisibility.PUBLIC && !constructor.name.matches(functionBlacklistRegex)) {
-                    tsSource += "${linePrefix}\tconstructor(${generateTypeScriptParameters(constructor, true)});\n"
+                if (!constructor.name.matches(functionBlacklistRegex)) {
+                    tsSource += "${linePrefix}\tconstructor(${generateTypeScriptParameters(constructor.parameters, true)});\n"
                 }
             }
         }
         catch (ex: NoClassDefFoundError) {
-            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.qualifiedName}): $ex")
+            println(LoggingLevel.WARNING, "generateTypeScriptClassDeclaration(${baseClass.name}): $ex")
         }
 
-        val companionObject = baseClass.companionObject
-        if(companionObject != null) {
-            tsSource += generateTypeScriptFunctionDeclarations(companionObject.memberFunctions, linePrefix, "public static ")
-        }
+//        val companionObject = baseClass.companionObject
+//        if(companionObject != null) {
+//            tsSource += generateTypeScriptFunctionDeclarations(companionObject.memberFunctions, linePrefix, "public static ")
+//        }
 
-        tsSource += generateTypeScriptFunctionDeclarations(baseClass.staticFunctions, linePrefix, "public static ")
-        tsSource += generateTypeScriptFunctionDeclarations(baseClass.memberFunctions, linePrefix, "public ")
+        tsSource += generateTypeScriptFunctionDeclarations(baseClass, linePrefix)
 
 
         tsSource += "${linePrefix}}\n\n"
@@ -767,7 +692,7 @@ class TypeScriptDefinitionGenerator(
             "function" to "_function",
             "yield" to "_yield",
             "arguments" to "_arguments",
-            "name" to "_name",
+            "name" to "'name'",
             "<set-?>" to "value",
             "in" to "_in",
             "with" to "_with",
@@ -779,22 +704,6 @@ class TypeScriptDefinitionGenerator(
         companion object {
             fun fromJsonObject(configJson: String): Configuration? {
                 return Klaxon().parse<Configuration>(configJson)
-            }
-        }
-    }
-
-    class ClassDescription (
-        @Json(name = "p", index = 0)
-        val packageName: String = "",
-        @Json(name = "l", index = 1)
-        val className: String = "",
-    ) {
-        override fun toString(): String =
-            if(packageName.isNotEmpty() && className.isNotEmpty()) "$packageName.$className" else ""
-
-        companion object {
-            fun fromJsonObject(classDescriptionJson: String): ClassDescription? {
-                return Klaxon().parse<ClassDescription>(classDescriptionJson)
             }
         }
     }

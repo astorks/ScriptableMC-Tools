@@ -8,7 +8,7 @@ plugins {
     id("org.jetbrains.gradle.plugin.idea-ext")
 }
 
-version = "1.0.0-SNAPSHOT"
+version = "1.0.1-SNAPSHOT"
 group = "com.pixlfox.scriptablemc"
 
 repositories {
